@@ -30,7 +30,7 @@ func plural(n int, one, many string) string {
 
 func (a *app) cmdEncrypt() *cobra.Command {
 	var pf pairFlags
-	var force bool
+	var force, keepBoth bool
 	c := &cobra.Command{
 		Use:   "encrypt",
 		Short: "encrypt the unencrypted file into the encrypted file",
@@ -39,7 +39,9 @@ into the encrypted file. Unchanged values keep their ciphertext so diffs stay sm
 under a retired key are migrated. Refuses to overwrite paths changed on the encrypted side
 (encrypted-newer or conflict) unless --force is given. --force resolves conflicts in favour
 of the unencrypted file; paths changed only on the encrypted side are kept and stay pending.
-Needs the private key.`,
+On success the unencrypted file is deleted unless --keep-both is given. When the encrypted
+file is missing (removed by decrypt), its saved copy or the version at git HEAD supplies the
+key and unchanged ciphertexts. Needs the private key.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			e, err := loadEnv()
@@ -58,7 +60,7 @@ Needs the private key.`,
 				return err
 			}
 			defer unlock()
-			enc, err := pair.ReadEncrypted(p.EncryptedPath)
+			enc, restored, err := readEncryptedOrStash(e.home, p)
 			if err != nil {
 				return err
 			}
@@ -145,19 +147,27 @@ Needs the private key.`,
 					reused++
 				}
 			}
-			if bytes.Equal(pair.MarshalEncrypted(next), pair.MarshalEncrypted(enc)) {
+			if !restored && bytes.Equal(pair.MarshalEncrypted(next), pair.MarshalEncrypted(enc)) {
 				outf(cmd, "%s is already up to date (%d %s)\n", p.Rel(p.EncryptedPath), total, plural(total, "value", "values"))
-				return nil
+			} else {
+				if err := pair.WriteEncrypted(p.EncryptedPath, next); err != nil {
+					return err
+				}
+				outf(cmd, "encrypted %d %s into %s (%d unchanged, %d newly encrypted)\n", total, plural(total, "value", "values"), p.Rel(p.EncryptedPath), reused, total-reused)
 			}
-			if err := pair.WriteEncrypted(p.EncryptedPath, next); err != nil {
-				return err
+			dropStash(e.home, p.EncryptedPath)
+			if !keepBoth {
+				if err := os.Remove(p.UnencryptedPath); err != nil {
+					return xerr.Failure("%s: encrypted, but the unencrypted file could not be removed", p.Rel(p.UnencryptedPath))
+				}
+				outf(cmd, "removed %s (pass --keep-both to keep it)\n", p.Rel(p.UnencryptedPath))
 			}
-			outf(cmd, "encrypted %d %s into %s (%d unchanged, %d newly encrypted)\n", total, plural(total, "value", "values"), p.Rel(p.EncryptedPath), reused, total-reused)
 			return nil
 		},
 	}
 	addPairFlags(c, &pf)
 	c.Flags().BoolVar(&force, "force", false, "overwrite paths in conflict (paths changed only on the encrypted side are kept and stay pending)")
+	c.Flags().BoolVar(&keepBoth, "keep-both", false, "keep the unencrypted file instead of deleting it")
 	return c
 }
 
@@ -214,14 +224,16 @@ func keepEncryptedSide(enc *pair.Encrypted, body *doc.Value, ptrs []string) (kep
 
 func (a *app) cmdDecrypt() *cobra.Command {
 	var pf pairFlags
-	var force, bypass bool
+	var force, bypass, keepBoth bool
 	c := &cobra.Command{
 		Use:   "decrypt",
 		Short: "[human-only] decrypt the encrypted file into the unencrypted file",
 		Long: `Writes every decrypted value into the unencrypted .json file (mode 0600, git-ignored).
 Human-only: requires an interactive terminal, no agent environment and a typed confirmation
 word. Refuses when the unencrypted file has unsaved edits (unencrypted-newer or conflict)
-unless --force is given. Never writes .jsonc files.`,
+unless --force is given. Never writes .jsonc files. On success the encrypted file is deleted
+unless --keep-both is given; a copy (ciphertext only) is saved under ~/.guiho/jureuma/state so
+the next jureuma encrypt reuses the same key and unchanged ciphertexts.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			e, err := loadEnv()
@@ -288,17 +300,28 @@ unless --force is given. Never writes .jsonc files.`,
 			next := &pair.Encrypted{Meta: enc.Meta, Body: enc.Body}
 			next.Meta.Sync = pair.ComputeSync(sk, plain, enc.Body)
 			next.Meta.Pending = nil
-			if !bytes.Equal(pair.MarshalEncrypted(next), pair.MarshalEncrypted(enc)) {
-				if err := pair.WriteEncrypted(p.EncryptedPath, next); err != nil {
-					return err
-				}
-			}
 			outf(cmd, "decrypted %d %s into %s\n", n, plural(n, "value", "values"), p.Rel(p.UnencryptedPath))
+			if keepBoth {
+				if !bytes.Equal(pair.MarshalEncrypted(next), pair.MarshalEncrypted(enc)) {
+					if err := pair.WriteEncrypted(p.EncryptedPath, next); err != nil {
+						return err
+					}
+				}
+				return nil
+			}
+			if err := saveStash(e.home, p.EncryptedPath, next); err != nil {
+				return xerr.Failure("decrypted, but could not save a copy of %s; it was kept", p.Rel(p.EncryptedPath))
+			}
+			if err := os.Remove(p.EncryptedPath); err != nil {
+				return xerr.Failure("decrypted, but %s could not be removed", p.Rel(p.EncryptedPath))
+			}
+			outf(cmd, "removed %s (run jureuma encrypt to recreate it, or pass --keep-both to keep it)\n", p.Rel(p.EncryptedPath))
 			return nil
 		},
 	}
 	addPairFlags(c, &pf)
 	c.Flags().BoolVar(&force, "force", false, "overwrite unsaved edits in the unencrypted file")
+	c.Flags().BoolVar(&keepBoth, "keep-both", false, "keep the encrypted file instead of deleting it")
 	addBypassFlag(c, &bypass, "skip the human-only gate (only when a human explicitly asked; audited)")
 	return c
 }

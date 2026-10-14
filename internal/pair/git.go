@@ -232,3 +232,26 @@ func HeadPublicKey(path string) (pk string, ok bool) {
 	}
 	return p.S, true
 }
+
+// CommittedContent returns the content of path at git HEAD, or false when
+// git is unavailable or the file is not committed.
+func CommittedContent(path string) ([]byte, bool) {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return nil, false
+	}
+	dir := filepath.Dir(abs)
+	code, top, err := git(dir, "rev-parse", "--show-toplevel")
+	if err != nil || code != 0 {
+		return nil, false
+	}
+	rel, err := filepath.Rel(strings.TrimSpace(string(top)), abs)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		return nil, false
+	}
+	code, out, err := git(dir, "show", "HEAD:"+filepath.ToSlash(rel))
+	if err != nil || code != 0 {
+		return nil, false
+	}
+	return out, true
+}

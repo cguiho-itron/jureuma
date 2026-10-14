@@ -161,7 +161,7 @@ func TestSchemaFileCannotLoosenTheDefaultSchema(t *testing.T) {
 	p.init()
 	p.write("config.schema.json", `{"type":"object","properties":{"pool":{"type":"integer","maximum":10}}}`)
 	p.write("config.unencrypted.json", `{"pool":5}`)
-	p.expect(0, "encrypt")
+	p.expect(0, "encrypt", "--keep-both")
 	p.write("loose.schema.json", `{}`)
 	if r := p.run("set", "/pool", "--json", "99", "--schema-file", "loose.schema.json"); r.code != 2 {
 		t.Fatalf("--schema-file disagreeing with config.schema.json: want exit 2\n%s", r)
@@ -172,7 +172,7 @@ func TestDecryptKeepsEmptyContainerEdits(t *testing.T) {
 	p := newProject(t)
 	p.setup(`{"a":"one1"}`)
 	p.write("config.unencrypted.json", `{"a":"one1","features":{},"hosts":[]}`)
-	if r := p.run("decrypt", "--dangerously-bypass-protections"); r.code == 0 {
+	if r := p.run("decrypt", "--keep-both", "--dangerously-bypass-protections"); r.code == 0 {
 		t.Fatalf("decrypt over new empty containers must refuse\n%s", r)
 	}
 	if !strings.Contains(p.read("config.unencrypted.json"), "features") {

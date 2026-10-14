@@ -137,7 +137,7 @@ The encrypted file mirrors the plaintext structure. Object keys and array positi
 }
 ```
 
-- `$jureuma` is the only plaintext value block. `sync` and `pending` are described under [Two-File Lifecycle](#two-file-lifecycle).
+- `$jureuma` is the only plaintext value block. `sync` and `pending` are described under [File Lifecycle](#file-lifecycle).
 - Empty objects and arrays stay as `{}` and `[]`.
 - All values are encrypted, as required. Plaintext opt-outs (like dotenvx `_PLAIN`) are not supported in v1 (Q3).
 - An agent can read this file or run `jureuma list` to learn which settings exist, their nesting, and array lengths, without learning values or their types.
@@ -295,7 +295,15 @@ Flatten rules:
 - The agent instruction forbids reading, opening, printing, grepping, or copying any `*.unencrypted.*` file and any file under `$HOME/.guiho/jureuma/`.
 - `jureuma init` offers to add deny rules for `*.unencrypted.*` to supported agent tools' settings (for example Claude Code `permissions.deny`). Accepting is recommended. Rules are written as a marker-tagged entry and recorded in the project state, so `jureuma uninstall` and `jureuma agent instruction remove` delete exactly what `jureuma` added. `jureuma check` warns when they are absent. These rules usually cover file-read tools, not shell commands such as `cat`, which is why the instruction also forbids them.
 
-## Two-File Lifecycle
+## File Lifecycle
+
+By default only **one side of a pair exists at a time**, so the state is obvious from the filesystem:
+
+- `jureuma encrypt` writes the encrypted file and then **deletes the unencrypted file**.
+- `jureuma decrypt` writes the unencrypted file and then **deletes the encrypted file**. Before deleting, it saves a copy (ciphertext and `$jureuma` metadata only) to `~/.guiho/jureuma/state/stash/<hash>.encrypted.json`.
+- `--keep-both` on either command keeps both files.
+- When the encrypted file is missing, `encrypt` restores the key, sync baseline and unchanged ciphertexts from that saved copy, falling back to the version at git `HEAD`. The saved copy is removed once the encrypted file exists again.
+- While a pair is decrypted, commands that need the encrypted file (`set`, `unset`, `run`, `list`) fail with `not found (run jureuma encrypt …)`; a human finishes editing and runs `jureuma encrypt`.
 
 ```text
           human edits                       jureuma encrypt
@@ -329,7 +337,7 @@ config.unencrypted.json  ──────────────────�
 
 ### Rules
 
-- **Human workflow:** `jureuma decrypt` → edit `config.unencrypted.json` → `jureuma encrypt`.
+- **Human workflow:** `jureuma decrypt` (removes the encrypted file) → edit `config.unencrypted.json` → `jureuma encrypt` (removes the unencrypted file).
 - **Agent workflow:** `jureuma set /path` writes the encrypted file using the public key, adds the path to `pending`, and, if a `.json` unencrypted file exists, writes the same value into it (the agent already knows the value it set). The encrypted file is written first, then the unencrypted file.
 - `encrypt` refuses to overwrite any path in `conflict` or `encrypted-newer` unless `--force` is given, so an agent's `set` is never silently lost. `--force` resolves conflicts in favour of the plaintext only: a path changed on the encrypted side alone keeps its ciphertext (or stays removed), stays in `pending` and is listed on stderr; one that no longer fits the plaintext structure is listed as discarded. On success `encrypt` refreshes `sync` and clears every other `pending` entry.
 - `decrypt` refuses when the plaintext file has paths in `unencrypted-newer` or `conflict` (unsaved human edits), or new empty objects or arrays that the encrypted side lacks, unless `--force` is given.
@@ -482,7 +490,7 @@ agent:
 | --- | --- | --- | --- |
 | `$HOME/.guiho/jureuma/keys/` (incl. `retired/`) | **persistent data** | preserved | removed only after the human-only gate; preserved automatically when non-interactive |
 | `$HOME/.guiho/jureuma/audit.log` | persistent data | preserved | removed (kept with `--preserve-data`) |
-| `$HOME/.guiho/jureuma/state/` | persistent data | preserved | removed (kept with `--preserve-data`) |
+| `$HOME/.guiho/jureuma/state/` (incl. `stash/`, saved encrypted copies) | persistent data | preserved | removed (kept with `--preserve-data`) |
 | `$HOME/.guiho/jureuma/locks/` | disposable | cleared when unowned | removed |
 | `$HOME/.guiho/jureuma/run/` | disposable | stale entries removed | removed |
 | `$HOME/.guiho/jureuma/cache.json` | disposable | reset | removed |

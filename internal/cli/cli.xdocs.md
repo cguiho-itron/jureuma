@@ -7,6 +7,7 @@ files:
   "cli.go": "Root command, Execute, global flags and exit-code mapping."
   "helpdocs.go": "--help-docs and --help-tree rendering."
   "context.go": "Shared command environment (project root, configuration, pair resolution)."
+  "stash.go": "Saved copy of an encrypted file removed by decrypt, and its restore (saved copy, then git HEAD) for encrypt."
   "cmd_values.go": "encrypt, decrypt, set, unset and get."
   "cmd_run.go": "run: inject configuration into a child process with redacted output."
   "cmd_info.go": "list, status and check."
@@ -51,6 +52,7 @@ The Cobra command tree: every command, help flags (--help-docs, --help-tree), ex
 - `cli.go`: Root command, Execute, global flags and exit-code mapping.
 - `helpdocs.go`: --help-docs and --help-tree rendering.
 - `context.go`: Shared command environment (project root, configuration, pair resolution).
+- `stash.go`: Saved copy of an encrypted file removed by decrypt, and its restore (saved copy, then git HEAD) for encrypt.
 - `cmd_values.go`: encrypt, decrypt, set, unset and get.
 - `cmd_run.go`: run: inject configuration into a child process with redacted output.
 - `cmd_info.go`: list, status and check.

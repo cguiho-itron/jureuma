@@ -121,7 +121,7 @@ Other mappings:
 
 `run` removes every `JUREUMA_PRIVATE_KEY*` variable from the child, redacts config values (and their common encodings) and private keys in the child's stdout and stderr as `[REDACTED]`, and returns the child's exit code. Exit `125` with a `[JUREUMA:...]` prefix means jureuma failed before or around the child. Seeing `[REDACTED]` is expected; do not try to recover what was redacted. Make the application read `JUREUMA_CONFIG` (or flattened variables) rather than adding `.env` files.
 
-**Human edit cycle** (tell the human; do not do it yourself): `jureuma decrypt` (human-only) → edit `config.unencrypted.json` → `jureuma encrypt`. An agent may run `jureuma encrypt` when the human asks, because jureuma reads the plaintext internally; it refuses paths in `conflict` unless `--force` is given, and an agent must not pass `--force` without the human's approval.
+**Human edit cycle** (tell the human; do not do it yourself): `jureuma decrypt` (human-only; deletes `config.encrypted.json`) → edit `config.unencrypted.json` → `jureuma encrypt` (deletes `config.unencrypted.json`). Only one side of a pair exists at a time unless `--keep-both` is passed; while a pair is decrypted, `set`, `run` and `list` report the encrypted file as missing, so ask the human to finish with `jureuma encrypt`. An agent may run `jureuma encrypt` when the human asks, because jureuma reads the plaintext internally; it refuses paths in `conflict` unless `--force` is given, and an agent must not pass `--force` without the human's approval.
 
 **Status states:** `in-sync`; `unencrypted-newer` (run `jureuma encrypt`); `encrypted-newer` (a human runs `jureuma decrypt`); `conflict` (a human resolves, then `encrypt --force` or `decrypt --force`); `unencrypted-missing` and `key-unavailable` (normal on agent and CI machines).
 
@@ -132,8 +132,8 @@ Pair-aware commands accept `--name`, `--encrypted-file`, `--unencrypted-file`, `
 | Command | Purpose |
 | --- | --- |
 | `jureuma init` | Initialize or reconcile jureuma for the project (see above). |
-| `jureuma encrypt [--force]` | Unencrypted file → encrypted file; validates the whole document first; reuses unchanged ciphertexts. |
-| `jureuma decrypt [--force]` [P] | Encrypted file → unencrypted file. |
+| `jureuma encrypt [--force] [--keep-both]` | Unencrypted file → encrypted file; validates the whole document first; reuses unchanged ciphertexts; deletes the unencrypted file unless `--keep-both`. |
+| `jureuma decrypt [--force] [--keep-both]` [P] | Encrypted file → unencrypted file; deletes the encrypted file unless `--keep-both`. |
 | `jureuma set <pointer> [value] [--json] [--value-stdin] [--value-file <path>] [--allow-invalid]` | Encrypt and store one value. |
 | `jureuma unset <pointer> [--allow-invalid]` | Remove one value or subtree. |
 | `jureuma get <pointer>` [P] | Print one plaintext value. |

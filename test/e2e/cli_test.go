@@ -52,7 +52,7 @@ func TestSchemaInferThenValidation(t *testing.T) {
 	// A plaintext edit that breaks the schema: encrypt exits 4 naming only the path.
 	enc := p.read("config.encrypted.json")
 	p.write("config.unencrypted.json", `{"server":{"port":"`+v2+`","host":"`+v1+`"},"tags":["a","b"],"mixed":[1,"x"],"empty":[],"on":true}`)
-	r = p.run("encrypt")
+	r = p.run("encrypt", "--keep-both")
 	if r.code != 4 || !strings.Contains(r.out(), "/server/port") {
 		t.Fatalf("schema violation: want exit 4 naming /server/port\n%s", r)
 	}
@@ -86,7 +86,7 @@ func TestSchemaInferThenValidation(t *testing.T) {
     "server": {"type": "object", "properties": {"port": {"type": "integer", "maximum": 100,},},},
   },
 }`)
-	r = p.run("encrypt")
+	r = p.run("encrypt", "--keep-both")
 	if r.code != 4 || !strings.Contains(r.out(), "maximum") {
 		t.Fatalf("jsonc schema maximum: want exit 4\n%s", r)
 	}

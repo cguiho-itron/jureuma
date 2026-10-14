@@ -179,10 +179,10 @@ func TestStatusStates(t *testing.T) {
 		t.Fatal("status modified a file")
 	}
 	// encrypt refuses to lose the agent's set; decrypt refuses to lose the human edit.
-	if r := p.run("encrypt"); r.code == 0 {
+	if r := p.run("encrypt", "--keep-both"); r.code == 0 {
 		t.Fatalf("encrypt over a conflict must refuse\n%s", r)
 	}
-	if r := p.run("decrypt", "--dangerously-bypass-protections"); r.code == 0 {
+	if r := p.run("decrypt", "--keep-both", "--dangerously-bypass-protections"); r.code == 0 {
 		t.Fatalf("decrypt over unsaved edits must refuse\n%s", r)
 	}
 	if p.read("config.encrypted.json") != enc || p.read("config.unencrypted.json") != plain {
@@ -190,7 +190,7 @@ func TestStatusStates(t *testing.T) {
 	}
 	// --force resolves the conflict on /a in favour of the plaintext, but
 	// keeps the agent's keyless set of /b (encrypted-newer only) pending.
-	r := p.expect(0, "encrypt", "--force")
+	r := p.expect(0, "encrypt", "--keep-both", "--force")
 	if !strings.Contains(r.stderr, "/b") {
 		t.Fatalf("encrypt --force must list the kept encrypted-side change\n%s", r)
 	}
@@ -201,7 +201,7 @@ func TestStatusStates(t *testing.T) {
 	if pending, _ := p.encMeta("config.encrypted.json")["pending"].([]any); len(pending) != 1 {
 		t.Fatalf("encrypt --force must keep /b pending: %v", pending)
 	}
-	p.expect(0, "decrypt", "--dangerously-bypass-protections")
+	p.expect(0, "decrypt", "--keep-both", "--dangerously-bypass-protections")
 	if o, _ := p.statusJSON(); o != "in-sync" {
 		t.Fatalf("after decrypt: %s", o)
 	}
@@ -215,12 +215,12 @@ func TestStatusStates(t *testing.T) {
 		t.Fatalf("without plaintext: %s", o)
 	}
 	// decrypt --force overrides unsaved edits.
-	p.expect(0, "decrypt", "--dangerously-bypass-protections")
+	p.expect(0, "decrypt", "--keep-both", "--dangerously-bypass-protections")
 	p.write("config.unencrypted.json", `{"a":"edited","b":"bravo-2","c":"charlie-1"}`)
-	if r := p.run("decrypt", "--dangerously-bypass-protections"); r.code == 0 {
+	if r := p.run("decrypt", "--keep-both", "--dangerously-bypass-protections"); r.code == 0 {
 		t.Fatalf("decrypt over an edit must refuse\n%s", r)
 	}
-	p.expect(0, "decrypt", "--dangerously-bypass-protections", "--force")
+	p.expect(0, "decrypt", "--keep-both", "--dangerously-bypass-protections", "--force")
 	if o, _ := p.statusJSON(); o != "in-sync" {
 		t.Fatalf("after decrypt --force: %s", o)
 	}
@@ -230,7 +230,7 @@ func TestCheckFailures(t *testing.T) {
 	p := newProject(t)
 	p.setup(`{"svc":{"url":"check-value-url"}}`)
 	p.expect(0, "schema", "infer")
-	p.expect(0, "encrypt")
+	p.expect(0, "encrypt", "--keep-both")
 	r := p.expect(0, "check")
 	assertNo(t, "check", r.out(), "check-value-url")
 
@@ -277,7 +277,7 @@ func TestCheckFailures(t *testing.T) {
 	// keyId that does not match publicKey: exit 5 everywhere the file is loaded.
 	mismatch := strings.Replace(orig, `"keyId": "`+meta["keyId"].(string)+`"`, `"keyId": "`+crypt.KeyID(otherPK)+`"`, 1)
 	p.write("config.encrypted.json", mismatch)
-	for _, args := range [][]string{{"check"}, {"status"}, {"list"}, {"encrypt"}, {"set", "/svc/url", "x"}} {
+	for _, args := range [][]string{{"check"}, {"status"}, {"list"}, {"encrypt", "--keep-both"}, {"set", "/svc/url", "x"}} {
 		if r := p.run(args...); r.code != 5 {
 			t.Fatalf("keyId/publicKey mismatch: want exit 5\n%s", r)
 		}

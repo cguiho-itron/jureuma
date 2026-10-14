@@ -34,7 +34,7 @@ func TestSentinelNeverDisplayed(t *testing.T) {
 	p.expect(0, "init", "--agent-deny-rules", "yes", "--agent-evolution", "always-ask")
 	p.write("config.unencrypted.json", `{"db":{"url":"`+sentinelA+`","pool":5},"flags":["`+sentinelA+`"],"debug":false}`)
 	p.expect(0, "schema", "infer")
-	p.expect(0, "encrypt")
+	p.expect(0, "encrypt", "--keep-both")
 	keyID, sk := p.privateKey()
 
 	type step struct {
@@ -50,7 +50,7 @@ func TestSentinelNeverDisplayed(t *testing.T) {
 		{args: []string{"list", "--output", "json"}},
 		{args: []string{"check"}},
 		{args: []string{"key", "show"}},
-		{args: []string{"encrypt"}},
+		{args: []string{"encrypt", "--keep-both"}},
 		// set never echoes, and failing sets never echo either.
 		{stdin: sentinelB + "\n", args: []string{"set", "/token", "--value-stdin", "--allow-invalid"}},
 		{stdin: sentinelB + "\n", args: []string{"set", "/db/pool", "--value-stdin"}},                                        // string for a number: exit 4
@@ -65,7 +65,7 @@ func TestSentinelNeverDisplayed(t *testing.T) {
 		{args: []string{"get", "/db/url"}},                                                                                   // refused
 		{env: agent, args: []string{"get", "/db/url"}},                                                                       // refused
 		{args: []string{"get", "/flags"}},                                                                                    // refused
-		{args: []string{"decrypt"}},                                                                                          // refused
+		{args: []string{"decrypt", "--keep-both"}},                                                                           // refused
 		{args: []string{"key", "export"}},                                                                                    // refused
 		{args: []string{"key", "export", keyID}},                                                                             // refused
 		{args: []string{"key", "show", "--private"}},                                                                         // refused
@@ -77,7 +77,7 @@ func TestSentinelNeverDisplayed(t *testing.T) {
 		{args: []string{"status"}},
 		{args: []string{"check"}},
 		{args: []string{"schema", "infer", "--force"}},
-		{args: []string{"encrypt"}},
+		{args: []string{"encrypt", "--keep-both"}},
 		{args: []string{"key", "rotate"}},
 		{args: []string{"status"}},
 		{args: []string{"run", "--", "env"}},
@@ -94,7 +94,7 @@ func TestSentinelNeverDisplayed(t *testing.T) {
 	}
 
 	// Validation and parse failures that involve the plaintext file.
-	p.expect(0, "decrypt", "--dangerously-bypass-protections")
+	p.expect(0, "decrypt", "--keep-both", "--dangerously-bypass-protections")
 	bad := []string{
 		`{"db":{"url":"` + sentinelA + `","pool":"` + sentinelC + `"},"flags":["x"],"debug":false,"token":"t"}`, // schema type
 		`{"db":{"url":"` + sentinelA + `","pool":5},"flags":["x"],"debug":false,"token":"t","extra":"` + sentinelC + `"}`,
@@ -104,7 +104,7 @@ func TestSentinelNeverDisplayed(t *testing.T) {
 	}
 	for _, doc := range bad {
 		p.write("config.unencrypted.json", doc)
-		for _, args := range [][]string{{"encrypt"}, {"status"}, {"check"}, {"schema", "infer", "--force"}} {
+		for _, args := range [][]string{{"encrypt", "--keep-both"}, {"status"}, {"check"}, {"schema", "infer", "--force"}} {
 			r := p.run(args...)
 			for _, f := range sentinelForms() {
 				if strings.Contains(r.out(), f) {

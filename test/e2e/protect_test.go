@@ -23,7 +23,7 @@ func TestHumanOnlyCommandsRefuseWithoutTerminal(t *testing.T) {
 	keyID, sk := p.privateKey()
 	commands := [][]string{
 		{"get", "/db/password"},
-		{"decrypt"},
+		{"decrypt", "--keep-both"},
 		{"key", "export"},
 		{"key", "export", keyID},
 		{"key", "show", "--private"},
@@ -179,7 +179,7 @@ func TestHumanConfirmationUnderTerminal(t *testing.T) {
 		t.Fatalf("answering y must refuse: exit %d\n%s", code, out)
 	}
 	p.remove("config.unencrypted.json")
-	_, code = confirm(func(w string) string { return w }, "decrypt")
+	_, code = confirm(func(w string) string { return w }, "decrypt", "--keep-both")
 	if code != 0 || !strings.Contains(p.read("config.unencrypted.json"), "human-typed-value") {
 		t.Fatalf("typed confirmation for decrypt: exit %d", code)
 	}
@@ -219,7 +219,7 @@ func TestBypassFlag(t *testing.T) {
 		t.Fatalf("key export printed something else\n%s", r)
 	}
 	p.remove("config.unencrypted.json")
-	p.expect(0, "decrypt", "--dangerously-bypass-protections")
+	p.expect(0, "decrypt", "--keep-both", "--dangerously-bypass-protections")
 	if !strings.Contains(p.read("config.unencrypted.json"), secret) {
 		t.Fatal("decrypt did not write the value")
 	}
@@ -268,7 +268,7 @@ func TestAllowBypassFalseAndTamperedProtections(t *testing.T) {
 	os.WriteFile(global, []byte(strings.Replace(string(orig), "allowBypass: true", "allowBypass: false", 1)), 0o600)
 	for _, args := range [][]string{
 		{"get", "/k", "--dangerously-bypass-protections"},
-		{"decrypt", "--dangerously-bypass-protections"},
+		{"decrypt", "--keep-both", "--dangerously-bypass-protections"},
 		{"key", "export", "--dangerously-bypass-protections"},
 	} {
 		r := p.run(args...)

@@ -79,7 +79,7 @@ func TestEndToEndNoValueLeaks(t *testing.T) {
 	h.expect(0, "", "init", "--agent-deny-rules", "yes")
 	h.write("config.unencrypted.json", `{"db":{"url":"`+sentinelA+`","pool":5},"debug":false}`)
 	h.expect(0, "", "schema", "infer")
-	h.expect(0, "", "encrypt")
+	h.expect(0, "", "encrypt", "--keep-both")
 	if out := h.expect(0, "", "list"); !strings.Contains(out, "DB_URL") || !strings.Contains(out, "number") {
 		t.Fatalf("list output: %s", out)
 	}
@@ -107,7 +107,7 @@ func TestEndToEndNoValueLeaks(t *testing.T) {
 		t.Fatalf("run usage failure: %d %s", code, out)
 	}
 	// Human-only commands refuse without a terminal.
-	for _, args := range [][]string{{"get", "/db/url"}, {"decrypt"}, {"key", "show", "--private"}, {"key", "export"}} {
+	for _, args := range [][]string{{"get", "/db/url"}, {"decrypt", "--keep-both"}, {"key", "show", "--private"}, {"key", "export"}} {
 		code, out := h.run("", args...)
 		if code != 3 || !strings.HasPrefix(out, "[PROTECTED] jureuma ") {
 			t.Fatalf("%v: exit %d %s", args, code, out)
@@ -134,7 +134,7 @@ func TestEndToEndNoValueLeaks(t *testing.T) {
 	if code != 0 || !strings.Contains(out, sentinelA) {
 		t.Fatalf("bypass get: %d %s", code, out)
 	}
-	code, _ = h.runRaw("", "decrypt", "--dangerously-bypass-protections")
+	code, _ = h.runRaw("", "decrypt", "--keep-both", "--dangerously-bypass-protections")
 	if code != 0 {
 		t.Fatal("bypass decrypt failed")
 	}

@@ -311,7 +311,7 @@ func (p *project) setup(plaintext string) {
 	p.t.Helper()
 	p.init()
 	p.write("config.unencrypted.json", plaintext)
-	p.expect(0, "encrypt")
+	p.expect(0, "encrypt", "--keep-both")
 }
 
 // keyFiles returns the active key files.

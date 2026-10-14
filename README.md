@@ -10,6 +10,7 @@ config.schema.json        JSON Schema (inferred, then refined by agents); commit
 
 - Values are encrypted one by one with X25519 public-key encryption. Anyone with the committed public key can encrypt (`set`), and only the private key in `~/.guiho/jureuma/keys/` (or a `JUREUMA_PRIVATE_KEY` variable in CI) can decrypt.
 - `jureuma run -- <command>` decrypts in memory and passes the whole document to the child as JSON in `JUREUMA_CONFIG`. `--format flatten` (one variable per value) and `--format file` (a path to the document) are the alternatives. The child's output is redacted.
+- Only one side of a pair exists at a time: `encrypt` deletes the unencrypted file and `decrypt` deletes the encrypted file (keeping a ciphertext copy under `~/.guiho/jureuma/state/` so the next `encrypt` reuses the key). Pass `--keep-both` to keep both.
 - `decrypt`, `get`, `key show --private` and `key export` are human-only: they need an interactive terminal, no agent markers in the environment, and a typed confirmation word.
 - `juju` is an optional short alias.
 
@@ -101,7 +102,7 @@ cd my-project
 jureuma init                       # keys, jureuma.yaml, config pair, .gitignore block, starter schema, agent skill, AGENTS.md block
 $EDITOR config.unencrypted.json    # a human writes plain JSON values
 jureuma schema infer               # schema from the structure and types (never values); refine it, mark secrets "x-jureuma-secret": true
-jureuma encrypt                    # write config.encrypted.json; commit it together with config.schema.json
+jureuma encrypt                    # write config.encrypted.json and delete the plaintext (--keep-both keeps it)
 jureuma list                       # pointers, flattened names, types; never values
 jureuma status                     # sync state per path
 printf '%s' "$NEW_TOKEN" | jureuma set /apiKey --value-stdin

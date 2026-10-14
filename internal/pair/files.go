@@ -65,10 +65,15 @@ func ReadEncrypted(path string) (*Encrypted, error) {
 	data, err := readLimited(path)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			return nil, &xerr.Error{Code: xerr.CodeFailure, Kind: xerr.KindFailure, Msg: name + ": not found (run jureuma init)", Err: fs.ErrNotExist}
+			return nil, &xerr.Error{Code: xerr.CodeFailure, Kind: xerr.KindFailure, Msg: name + ": not found (run jureuma encrypt if the configuration is decrypted, or jureuma init)", Err: fs.ErrNotExist}
 		}
 		return nil, readErr(name, err)
 	}
+	return ParseEncrypted(name, data)
+}
+
+// ParseEncrypted parses encrypted-file content; name is used in error messages.
+func ParseEncrypted(name string, data []byte) (*Encrypted, error) {
 	root, err := jsonc.Parse(data, true)
 	if err != nil {
 		return nil, xerr.Failure("%s: %v", name, err)

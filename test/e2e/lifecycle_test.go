@@ -155,7 +155,7 @@ func TestEncryptDecryptRoundTripKeepsOrderAndNumberText(t *testing.T) {
 	}
 
 	// encrypt again with no change: ciphertexts are reused.
-	r := p.expect(0, "encrypt")
+	r := p.expect(0, "encrypt", "--keep-both")
 	if p.read("config.encrypted.json") != enc {
 		t.Fatalf("re-encrypting unchanged values changed the file:\n%s", r)
 	}
@@ -167,7 +167,7 @@ func TestEncryptDecryptRoundTripKeepsOrderAndNumberText(t *testing.T) {
 
 	// decrypt recreates the plaintext with the same order and number text.
 	p.remove("config.unencrypted.json")
-	p.expect(0, "decrypt", "--dangerously-bypass-protections")
+	p.expect(0, "decrypt", "--keep-both", "--dangerously-bypass-protections")
 	dec := p.read("config.unencrypted.json")
 	want := `{"zeta":1,"alpha":{"b":1.0,"a":1e2,"c":-0.50},"num":100,"big":12345678901234567890.000,"arr":[3,"x",true,null,{}],"empty":[],"esc":"aé\"b","last":"Zz9"}`
 	if stripWS(dec) != want && stripWS(dec) != stripWS(plain) {
@@ -197,7 +197,7 @@ func TestJSONCInput(t *testing.T) {
   "tags": ["a", "b",],
 }
 `)
-	p.expect(0, "encrypt")
+	p.expect(0, "encrypt", "--keep-both")
 	enc := p.read("config.encrypted.json")
 	if strings.Contains(enc, "comment") || strings.Contains(enc, "jsonc-url-value") {
 		t.Fatalf("comments or values reached the encrypted file:\n%s", enc)
@@ -210,7 +210,7 @@ func TestJSONCInput(t *testing.T) {
 	}
 	// jureuma never writes .jsonc: decrypt refuses, set leaves it alone.
 	jsoncBefore := p.read("config.unencrypted.jsonc")
-	if r := p.run("decrypt", "--dangerously-bypass-protections"); r.code == 0 {
+	if r := p.run("decrypt", "--keep-both", "--dangerously-bypass-protections"); r.code == 0 {
 		t.Fatalf("decrypt wrote a .jsonc pair:\n%s", r)
 	}
 	p.expect(0, "set", "/db/url", "changed-by-set")
@@ -226,7 +226,7 @@ func TestJSONCInput(t *testing.T) {
 	}
 	// Both .json and .jsonc present is a usage error for every command.
 	p.write("config.unencrypted.json", `{}`)
-	for _, args := range [][]string{{"status"}, {"encrypt"}, {"list"}} {
+	for _, args := range [][]string{{"status"}, {"encrypt", "--keep-both"}, {"list"}} {
 		if r := p.run(args...); r.code != 2 {
 			t.Fatalf("both plaintext variants present: want exit 2\n%s", r)
 		}
@@ -234,7 +234,7 @@ func TestJSONCInput(t *testing.T) {
 	// Strict .json input rejects comments, with line/column only.
 	p.remove("config.unencrypted.jsonc")
 	p.write("config.unencrypted.json", "{\n  \"a\": \"strict-secret-text\", // no\n}\n")
-	r := p.run("encrypt")
+	r := p.run("encrypt", "--keep-both")
 	if r.code == 0 || !strings.Contains(r.stderr, "line 2") {
 		t.Fatalf("comment in .json must fail with a position:\n%s", r)
 	}
@@ -253,7 +253,7 @@ func TestGitignoreInvariant(t *testing.T) {
 	// Without the block, the next write restores it.
 	p.write(".gitignore", "node_modules/\n")
 	p.remove("config.unencrypted.json")
-	p.expect(0, "decrypt", "--dangerously-bypass-protections")
+	p.expect(0, "decrypt", "--keep-both", "--dangerously-bypass-protections")
 	if !strings.Contains(p.read(".gitignore"), "*.unencrypted.json") || !strings.Contains(p.read(".gitignore"), "node_modules/") {
 		t.Fatalf("block not restored (or user lines lost):\n%s", p.read(".gitignore"))
 	}
@@ -270,7 +270,7 @@ func TestGitignoreInvariant(t *testing.T) {
 	}
 	assertNo(t, "set warning", r0.out(), "mirror-blocked-value", "gitignore-value-1")
 	p.remove("config.unencrypted.json")
-	r := p.run("decrypt", "--dangerously-bypass-protections")
+	r := p.run("decrypt", "--keep-both", "--dangerously-bypass-protections")
 	if r.code != 1 || p.exists("config.unencrypted.json") || !strings.Contains(r.stderr, "git does not ignore") {
 		t.Fatalf("decrypt wrote a plaintext file git would not ignore:\n%s", r)
 	}
